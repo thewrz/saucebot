@@ -1039,7 +1039,9 @@ def test_parses_a_valid_config() -> None:
 
 
 def test_defaults_apply_to_a_minimal_config() -> None:
-    config = parse_config({"watch": {"channel_ids": [111]}, "response": {"templates": ["{source_url}"]}})
+    config = parse_config(
+        {"watch": {"channel_ids": [111]}, "response": {"templates": ["{source_url}"]}}
+    )
     assert config.search.max_searches_per_day == 8
     assert config.watch.min_seconds_between_callouts == 60
     assert config.match.self_match_threshold == 80
@@ -1198,7 +1200,9 @@ class SearchConfig(_Section):
     @field_validator("excluded_domains")
     @classmethod
     def normalise_domains(cls, value: frozenset[str]) -> frozenset[str]:
-        return frozenset(domain.strip().lower().removeprefix("www.") for domain in value if domain.strip())
+        return frozenset(
+            domain.strip().lower().removeprefix("www.") for domain in value if domain.strip()
+        )
 
 
 class MatchConfig(_Section):
@@ -1525,7 +1529,9 @@ def test_missing_exact_matches_key_is_empty() -> None:
 
 
 def test_results_missing_a_link_are_skipped() -> None:
-    payload = {"exact_matches": [{"position": 1, "title": "t", "source": "s"}, {"link": "https://ok"}]}
+    payload = {
+        "exact_matches": [{"position": 1, "title": "t", "source": "s"}, {"link": "https://ok"}]
+    }
     assert [h.url for h in parse_exact_matches(payload)] == ["https://ok"]
 
 
@@ -1549,9 +1555,13 @@ async def serpapi(aiohttp_server):
     return server, state
 
 
-async def make_engine(server, api_key: str = "test-key") -> tuple[SerpApiLensEngine, aiohttp.ClientSession]:
+async def make_engine(
+    server, api_key: str = "test-key"
+) -> tuple[SerpApiLensEngine, aiohttp.ClientSession]:
     session = aiohttp.ClientSession()
-    engine = SerpApiLensEngine(session=session, api_key=api_key, endpoint=str(server.make_url("/search")))
+    engine = SerpApiLensEngine(
+        session=session, api_key=api_key, endpoint=str(server.make_url("/search"))
+    )
     return engine, session
 
 
@@ -1703,7 +1713,9 @@ class SerpApiLensEngine:
         }
         timeout = aiohttp.ClientTimeout(total=SEARCH_TIMEOUT_SECONDS)
         try:
-            async with self._session.get(self._endpoint, params=params, timeout=timeout) as response:
+            async with self._session.get(
+                self._endpoint, params=params, timeout=timeout
+            ) as response:
                 payload = await self._read_json(response)
                 self._raise_for_status(response.status, payload)
         except aiohttp.ClientError as exc:
@@ -1778,12 +1790,17 @@ async def capture(image_url: str, name: str) -> int:
         "url": image_url,
         "api_key": api_key,
     }
-    async with aiohttp.ClientSession() as session, session.get(SERPAPI_ENDPOINT, params=params) as response:
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(SERPAPI_ENDPOINT, params=params) as response,
+    ):
         payload = await response.json(content_type=None)
         print(f"HTTP {response.status}")
 
     payload["search_metadata"] = {
-        key: value for key, value in payload.get("search_metadata", {}).items() if key in KEEP_METADATA
+        key: value
+        for key, value in payload.get("search_metadata", {}).items()
+        if key in KEEP_METADATA
     }
     if "exact_matches" in payload:
         payload["exact_matches"] = payload["exact_matches"][:5]
@@ -2050,7 +2067,9 @@ async def test_excluded_domains_are_dropped_before_choosing(tmp_path: Path) -> N
 
 
 async def test_no_hits_reports_not_found(tmp_path: Path) -> None:
-    result = await lookup_source(StubEngine(hits=[]), budget(tmp_path), EXCLUDED, "https://cdn/x.png", b"")
+    result = await lookup_source(
+        StubEngine(hits=[]), budget(tmp_path), EXCLUDED, "https://cdn/x.png", b""
+    )
     assert result.status == "not_found"
     assert result.hit is None
 
@@ -2405,7 +2424,10 @@ def test_first_non_self_hit_skips_the_posters_own_pages() -> None:
 
 
 def test_first_non_self_hit_returns_none_when_every_hit_is_the_poster() -> None:
-    hits = [hit("https://twitter.com/freaq/status/1"), hit("https://www.deviantart.com/freaq/art/X")]
+    hits = [
+        hit("https://twitter.com/freaq/status/1"),
+        hit("https://www.deviantart.com/freaq/art/X"),
+    ]
     assert first_non_self_hit(hits, ["freaq"], 80) is None
 
 
@@ -2587,7 +2609,9 @@ from saucebot.engines.base import SourceHit
 from saucebot.responses import author_label, render
 
 
-def hit(url: str = "https://knowyourmeme.com/memes/x", title: str = "Meme", site: str = "KYM") -> SourceHit:
+def hit(
+    url: str = "https://knowyourmeme.com/memes/x", title: str = "Meme", site: str = "KYM"
+) -> SourceHit:
     return SourceHit(url=url, title=title, site=site)
 
 
@@ -2809,7 +2833,9 @@ def test_image_attachments_skips_unknown_content_types() -> None:
 
 
 def test_identities_include_name_display_name_and_nick() -> None:
-    member = SimpleNamespace(name="username", global_name="Display Name", display_name="Server Nick")
+    member = SimpleNamespace(
+        name="username", global_name="Display Name", display_name="Server Nick"
+    )
     assert identities_of(member) == ["username", "Display Name", "Server Nick"]
 
 
@@ -2877,9 +2903,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 # The call-out may only ping the poster, never a role and never the server.
-SAFE_MENTIONS = discord.AllowedMentions(
-    everyone=False, roles=False, users=True, replied_user=True
-)
+SAFE_MENTIONS = discord.AllowedMentions(everyone=False, roles=False, users=True, replied_user=True)
 
 
 class Cooldown:
@@ -2919,7 +2943,11 @@ def image_attachments(message: discord.Message, limit: int) -> list[discord.Atta
 
 def identities_of(member: discord.abc.User) -> list[str]:
     """The names this person is known by, de-duplicated, most specific last."""
-    names = [member.name, getattr(member, "global_name", None), getattr(member, "display_name", None)]
+    names = [
+        member.name,
+        getattr(member, "global_name", None),
+        getattr(member, "display_name", None),
+    ]
     seen: list[str] = []
     for name in names:
         if name and name not in seen:
@@ -2945,7 +2973,9 @@ class Watcher(commands.Cog):
         except Exception:
             # The listener must never propagate: a traceback here would be logged
             # by discord.py but could also leave the channel silently unprocessed.
-            log.exception("watcher failed on message %s in channel %s", message.id, message.channel.id)
+            log.exception(
+                "watcher failed on message %s in channel %s", message.id, message.channel.id
+            )
 
     async def _inspect(self, message: discord.Message, config: Config) -> None:
         identities = identities_of(message.author)

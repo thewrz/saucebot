@@ -111,6 +111,7 @@ class SourceHit:
     title: str
     site: str
 
+
 class ImageSearchEngine(Protocol):
     async def search(self, image_url: str, image_bytes: bytes) -> list[SourceHit]: ...
 ```

@@ -1,0 +1,118 @@
+"""The manual ``?sauce`` command: search an attached image or a linked message's image."""
+
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+import discord
+from discord.ext import commands
+
+from saucebot.engines.base import DEFAULT_EXCLUDED_DOMAINS, EngineError, filter_excluded_domains
+
+if TYPE_CHECKING:
+    from saucebot.bot import SauceBot
+
+log = logging.getLogger(__name__)
+
+MESSAGE_LINK = re.compile(
+    r"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/channels/(\d+)/(\d+)/(\d+)/?$"
+)
+
+
+@dataclass(frozen=True)
+class MessageRef:
+    guild_id: int
+    channel_id: int
+    message_id: int
+
+
+def parse_message_link(text: str) -> MessageRef | None:
+    match = MESSAGE_LINK.match(text.strip())
+    if match is None:
+        return None
+    guild_id, channel_id, message_id = (int(group) for group in match.groups())
+    return MessageRef(guild_id=guild_id, channel_id=channel_id, message_id=message_id)
+
+
+def first_image_attachment(message: discord.Message) -> discord.Attachment | None:
+    for attachment in message.attachments:
+        if (attachment.content_type or "").startswith("image/"):
+            return attachment
+    return None
+
+
+class Sauce(commands.Cog):
+    def __init__(self, bot: SauceBot) -> None:
+        self.bot = bot
+
+    @commands.command(name="sauce")
+    @commands.guild_only()
+    async def sauce(self, ctx: commands.Context, ref_url: str | None = None) -> None:
+        target = ctx.message
+        if ref_url is not None:
+            ref = parse_message_link(ref_url)
+            if ref is None or ctx.guild is None or ref.guild_id != ctx.guild.id:
+                await ctx.reply("That isn't a message link from this server.")
+                return
+            fetched = await self._fetch_message(ctx.guild, ref, ctx.author)
+            if fetched is None:
+                await ctx.reply("I can't see that message.")
+                return
+            target = fetched
+        attachment = first_image_attachment(target)
+        if attachment is None:
+            await ctx.reply("Attach an image or link a message that has one.")
+            return
+        await self._lookup(ctx, attachment)
+
+    async def _fetch_message(
+        self, guild: discord.Guild, ref: MessageRef, author: discord.Member
+    ) -> discord.Message | None:
+        channel = guild.get_channel_or_thread(ref.channel_id)
+        if channel is None or not hasattr(channel, "fetch_message"):
+            return None
+        if not await self._can_read_source(channel, author):
+            return None
+        try:
+            return await channel.fetch_message(ref.message_id)
+        except discord.HTTPException:
+            return None
+
+    async def _can_read_source(
+        self, channel: discord.abc.GuildChannel, author: discord.Member
+    ) -> bool:
+        try:
+            permissions = channel.permissions_for(author)
+        except (discord.ClientException, AttributeError):
+            return False
+        if not permissions.view_channel or not permissions.read_message_history:
+            return False
+        if not isinstance(channel, discord.Thread) or not channel.is_private():
+            return True
+        if permissions.manage_threads:
+            return True
+        try:
+            return await channel.fetch_member(author.id) is not None
+        except (discord.NotFound, discord.HTTPException, AttributeError):
+            return False
+
+    async def _lookup(self, ctx: commands.Context, attachment: discord.Attachment) -> None:
+        try:
+            image_bytes = await attachment.read()
+            hits = await self.bot.engine.search(attachment.url, image_bytes)
+        except (EngineError, discord.HTTPException):
+            log.exception("sauce lookup failed for message %s", ctx.message.id)
+            await ctx.reply("Search failed. Check the logs.")
+            return
+        hits = filter_excluded_domains(hits, DEFAULT_EXCLUDED_DOMAINS)
+        if not hits:
+            await ctx.reply("No source found.")
+            return
+        await ctx.reply(f"Source: {hits[0].url}")
+
+
+async def setup(bot: SauceBot) -> None:
+    await bot.add_cog(Sauce(bot))

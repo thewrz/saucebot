@@ -10,6 +10,7 @@ import sys
 from dotenv import load_dotenv
 
 from saucebot.bot import SauceBot
+from saucebot.config import load_config
 from saucebot.engines.base import NullEngine
 from saucebot.errors import ConfigError
 from saucebot.secrets import load_secrets
@@ -28,7 +29,8 @@ def configure_logging() -> None:
 async def run() -> None:
     load_dotenv()
     secrets = load_secrets(os.environ)
-    bot = SauceBot(command_prefix="?", engine=NullEngine())
+    config = load_config(os.environ.get("SAUCEBOT_CONFIG", "config.toml"))
+    bot = SauceBot(command_prefix=config.command.prefix, engine=NullEngine())
     async with bot:
         await bot.start(secrets.discord_token)
 

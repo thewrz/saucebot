@@ -19,7 +19,11 @@ def build_intents() -> discord.Intents:
 
 class SauceBot(commands.Bot):
     def __init__(self, *, command_prefix: str, engine: ImageSearchEngine) -> None:
-        super().__init__(command_prefix=command_prefix, intents=build_intents())
+        super().__init__(
+            command_prefix=command_prefix,
+            intents=build_intents(),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
         self.engine = engine
 
     async def setup_hook(self) -> None:

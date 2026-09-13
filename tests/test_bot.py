@@ -24,4 +24,5 @@ async def test_setup_hook_loads_every_declared_extension(tmp_path) -> None:
     await bot.setup_hook()
     assert set(bot.extensions) == set(EXTENSIONS)
     assert bot.get_cog("Sauce") is not None
+    assert bot.get_cog("Watcher") is not None
     await bot.close()

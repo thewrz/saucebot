@@ -23,7 +23,7 @@ and raise the concern in the PR body rather than silently diverging.
 
 | What | Path |
 |---|---|
-| Repository | `/home/adam/github/saucebot-fork` (remote `origin` = `thewrz/saucebot`, `upstream` = `sowwic/saucebot`) |
+| Repository | `<repository-root>` (remote `origin` = `thewrz/saucebot`, `upstream` = `sowwic/saucebot`) |
 | **The plan (your instruction set)** | `docs/superpowers/plans/2026-09-12-saucebot-watcher.md` |
 | The design spec (the *why*) | `docs/superpowers/specs/2026-09-12-saucebot-watcher-design.md` |
 | This handoff | `docs/superpowers/handoff-codex-execution.md` |
@@ -38,8 +38,8 @@ intent is unclear, not to re-litigate it.
   not yet pushed.** PR 1 bases on it, so the plan's Task 0 pushes it first. Do
   that before any `gh pr create`, or the base ref will not exist.
 - `main` is still upstream's last commit (`e8118c1`). Nothing has been built yet.
-- `IMG_5524.jpg` sits untracked in the repo root. It is a real negative-case test
-  image. PR 3 (Task 8) moves it into `tests/fixtures/`. Do not delete it.
+- The personal negative-case image supplied during development was removed at
+  the owner's request. Use an operator-provided image outside Git for live checks.
 - `.agent/` is untracked session state. **Never commit it.**
 
 ## 3. "Ultracode" for Codex — what actually applies here
@@ -101,7 +101,7 @@ Every implementer subagent gets this verbatim, with the bracketed values filled:
 ```
 You are implementing ONE task from an approved plan. Do only this task.
 
-Repository: /home/adam/github/saucebot-fork
+Repository: <repository-root>
 Plan:       docs/superpowers/plans/2026-09-12-saucebot-watcher.md
 Your task:  Task [N] — [title]
 Your branch: [branch]

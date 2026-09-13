@@ -1,16 +1,18 @@
 # Copy to config.toml and edit. config.toml is gitignored; this example is tracked.
 
 [watch]
-# Channels the bot watches. Required, and it refuses to start if this is empty.
+# Exact channel IDs the bot watches. Required; list child thread IDs explicitly.
 channel_ids = [123456789012345678]
 # Users to call out. Leave empty to watch everyone who posts in those channels.
 user_ids = []
-# Per-user quiet period after a call-out, in seconds.
+# Per-user quiet period before another watched search attempt, in seconds.
+# It starts before the search and applies to no-result, self-match, and error outcomes.
 min_seconds_between_callouts = 60
 
 [search]
 engine = "serpapi_lens"
-# SerpApi's free plan is 250 searches a month; 8 a day stays inside it.
+# SerpApi's free plan is 250 searches a month; 8 shared attempts a day stays inside it.
+# The selected Discord CDN URL is sent to SerpApi, which fetches the image.
 max_searches_per_day = 8
 max_attachments_per_message = 3
 # Never cite these domains as a source. The Discord CDN hosts are always excluded.
@@ -34,4 +36,5 @@ templates = [
 [command]
 prefix = "?"
 # Where ?sauce may be used. Empty means anywhere the bot can see.
+# Manual commands share the daily cap but have no per-user cooldown.
 allowed_channel_ids = []

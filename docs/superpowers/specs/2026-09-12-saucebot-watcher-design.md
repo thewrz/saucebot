@@ -21,7 +21,7 @@ the poster appears to be the original author.
 | Search engine | SerpApi Google Lens (`type=exact_matches`) first; Google Cloud Vision web detection as a later second engine behind the same interface; SauceNao dropped (anime-only indexes, no photo-meme coverage — verified with a live test image) |
 | Self-match | Fuzzy only (rapidfuzz), no alias map |
 | Call-out format | Plain-text templates with placeholders; `reply` or `mention` mode |
-| Runtime | Docker on the wrz-droplet VPS (multi-service Ubuntu host) |
+| Runtime | Docker on a deployment VPS (multi-service Ubuntu host) |
 | Layout | Single installable package `saucebot/`, `python -m saucebot`, uv + ruff + pytest, multi-stage Dockerfile (matches python-discord/bot and kkrypt0nn template conventions surveyed 2026-09-12) |
 | License | MIT for the fork's changes, credit sowwic, note upstream carried no license; GPL `saucenao-api` dependency removed |
 
@@ -54,7 +54,7 @@ saucebot/
     watcher.py       passive on_message listener
     sauce.py         manual ?sauce command
 tests/
-  fixtures/          captured JSON responses; IMG_5524.jpg (negative smoke image)
+  fixtures/          captured JSON responses; personal smoke images stay outside Git
 docs/superpowers/specs/
 ```
 
@@ -255,7 +255,7 @@ CI (GitHub Actions, SHA-pinned): `ruff check`, `ruff format --check`,
 3. `feat: SerpApi Google Lens engine and daily budget` — `?sauce` wired to it
 4. `feat: author self-match filter`
 5. `feat: passive watcher with templated call-outs` — feature-complete
-6. `chore: Dockerfile and compose for wrz-droplet`
+6. `chore: Dockerfile and compose for the deployment host`
 7. (separate later issue) `feat: Google Vision engine`
 
 Each PR: GitHub issue first with labels, draft PR, attribution banner.

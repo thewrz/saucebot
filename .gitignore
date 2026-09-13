@@ -117,3 +117,9 @@ dmypy.json
 config.toml
 data/
 .env
+
+# Operator-provided images are private; use JSON fixtures in version control.
+/tests/fixtures/*.jpg
+/tests/fixtures/*.jpeg
+/tests/fixtures/*.png
+/IMG_*.jpg

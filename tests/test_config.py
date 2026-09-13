@@ -103,6 +103,21 @@ def test_malformed_template_braces_are_rejected() -> None:
         parse_config(with_change("response", "templates", ["{source_url"]))
 
 
+@pytest.mark.parametrize(
+    "template",
+    ["{}", "{0}", "{source_url:{timestamp}}", "{user!z}", "{user!r}"],
+)
+def test_unsupported_template_syntax_is_rejected(template: str) -> None:
+    with pytest.raises(ConfigError, match=r"response\.templates.*invalid syntax"):
+        parse_config(with_change("response", "templates", [template]))
+
+
+@pytest.mark.parametrize("template", ["{{literal}} {source_url}", "Use {{ and }}: {site}"])
+def test_escaped_literal_braces_are_accepted(template: str) -> None:
+    config = parse_config(with_change("response", "templates", [template]))
+    assert config.response.templates == (template,)
+
+
 def test_load_config_reads_a_file(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
     path.write_text(

@@ -4,7 +4,7 @@
 
 **Goal:** Turn the saucebot fork into a passive Discord watcher that reverse-image-searches images posted by targeted users in targeted channels and calls out reposts with a configurable line and source link, staying silent when nothing is found or when the poster is the author.
 
-**Architecture:** One installable package `saucebot/` started with `python -m saucebot`. A tiny engine interface (`SourceHit` list in, nothing Discord-aware) fronts SerpApi Google Lens; a daily budget gates every search; a pure fuzzy matcher suppresses self-posts; a template renderer produces the call-out; two discord.py 2.x extensions (`watcher`, `sauce`) glue it to Discord. Config is validated TOML, secrets are `.env`, deployment is Docker on the wrz-droplet VPS.
+**Architecture:** One installable package `saucebot/` started with `python -m saucebot`. A tiny engine interface (`SourceHit` list in, nothing Discord-aware) fronts SerpApi Google Lens; a daily budget gates every search; a pure fuzzy matcher suppresses self-posts; a template renderer produces the call-out; two discord.py 2.x extensions (`watcher`, `sauce`) glue it to Discord. Config is validated TOML, secrets are `.env`, deployment is Docker on a deployment VPS.
 
 **Tech Stack:** Python ≥ 3.12, uv, discord.py 2.7, aiohttp, python-dotenv, pydantic 2, rapidfuzz, ruff, pytest + pytest-asyncio, GitHub Actions, Docker.
 
@@ -59,7 +59,7 @@
 | `saucebot/exts/watcher.py` | Passive `on_message` cog |
 | `scripts/verify.sh` | Canonical local verification (lint, format, tests, audit); CI calls it |
 | `scripts/capture_serpapi_fixture.py` | Captures a real SerpApi response into `tests/fixtures/` |
-| `tests/…` | Boundary tests per module; `tests/fixtures/` holds captured JSON and `IMG_5524.jpg` |
+| `tests/…` | Boundary tests per module; `tests/fixtures/` holds captured JSON with anonymized request metadata; personal images stay outside Git |
 | `.github/workflows/ci.yml` | Runs `scripts/verify.sh` on PRs and `main` |
 | `Dockerfile`, `compose.yml`, `.dockerignore` | Deployment |
 | `config.example.toml`, `.env.example`, `README.md`, `LICENSE` | Operator docs |
@@ -1397,9 +1397,9 @@ Manual verification: with a real key in `.env`, `?sauce` on a widely-reposted im
 ```json
 {
   "search_metadata": {
-    "id": "6aa5c78adc74d0792f5a55e4",
+    "id": "fixture-exact-match-search",
     "status": "Success",
-    "created_at": "2026-09-12 21:43:38 UTC",
+    "created_at": "2000-01-01 00:00:00 UTC",
     "total_time_taken": 4.71
   },
   "search_parameters": {
@@ -1470,9 +1470,9 @@ with **no** `exact_matches` key and a top-level `error` string:
 ```json
 {
   "search_metadata": {
-    "id": "6aa5c742f6e9266efae862a0",
+    "id": "fixture-empty-search",
     "status": "Success",
-    "created_at": "2026-09-12 21:42:26 UTC",
+    "created_at": "2000-01-01 00:00:00 UTC",
     "total_time_taken": 11.9
   },
   "search_parameters": {
@@ -3059,12 +3059,12 @@ git commit -m "feat(watcher): call out reposts from watched users automatically"
 
 ---
 
-# PR 6 — `chore: Dockerfile and compose for wrz-droplet`
+# PR 6 — `chore: Dockerfile and compose for the deployment host`
 
 Branch `chore/deploy`, base `feat/watcher`. Labels `type:chore`, `area:deploy`.
-Why: the bot has to stay online, and wrz-droplet already runs its other services under Docker.
+Why: the bot has to stay online, and the deployment host already runs its other services under Docker.
 What: a digest-pinned multi-stage image, a compose file mounting config and data, and the operator runbook in the README.
-Manual verification: `docker compose up -d` on wrz-droplet, then `docker compose logs -f` shows the bot connecting; `?sauce` works in the server.
+Manual verification: `docker compose up -d` on the deployment host, then `docker compose logs -f` shows the bot connecting; `?sauce` works in the server.
 
 ## Task 14: Container image and compose
 
@@ -3155,7 +3155,7 @@ services:
           memory: 256M
 ```
 
-The memory limit and log rotation matter because wrz-droplet runs other services; an unbounded
+The memory limit and log rotation matter because the deployment host runs other services; an unbounded
 log or a leak must not take the host down.
 
 - [ ] **Step 4: Build and smoke-test the image locally**

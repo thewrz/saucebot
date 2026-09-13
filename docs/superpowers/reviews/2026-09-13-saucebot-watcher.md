@@ -28,7 +28,7 @@ Payload SHA-256: `6f482cb675d114d080a05a87d41dcfe30488ba3c7834c27d2f2ecf43975ed5
 | L8 | Watched channel IDs do not include child threads | Exact channel IDs are the approved selection behavior; operator documentation says to list thread IDs explicitly. |
 | L9 | Non-atomic persistence can reset budget on crash | Fixed in `899185d`: same-directory atomic replacement, temporary-file cleanup, and refusal on persistence failure. Corrupt-file recovery remains the explicitly tested plan behavior and is documented as a limitation. |
 | L10 | uv audit may be unavailable in CI | Not reproduced: canonical verification and all six actual CI jobs successfully ran `uv audit`. The gate remains mandatory. |
-| X1 | Negative-case image appears accidental | User-approved fixture explicitly required by handoff; preserved unchanged. No deletion. JSON fixtures drive offline engine tests; JPEG is for live negative-case verification. |
+| X1 | Negative-case image appears accidental | The originally supplied personal image was removed in a subsequent owner-requested privacy cleanup. JSON fixtures drive offline tests; use an operator-provided image outside Git for live negative checks. |
 | X2 | Third-party image submission undocumented | Operator documentation explains that SerpApi receives the selected Discord image URL and fetches the image. |
 
 ## Additional implementation review

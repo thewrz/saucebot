@@ -67,7 +67,6 @@ async def lookup_source(
 ) -> LookupResult:
     """Spend one unit of budget on a search and return the best non-excluded hit."""
     if not await budget.acquire():
-        log.info("daily search budget exhausted; skipping %s", image_url)
         return LookupResult(status="over_budget")
     try:
         hits = await engine.search(image_url, image_bytes)

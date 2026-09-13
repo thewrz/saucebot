@@ -1,10 +1,15 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import discord
 import pytest
 
-from saucebot.exts.sauce import MessageRef, first_image_attachment, parse_message_link
+from saucebot.budget import DailyBudget
+from saucebot.config import parse_config
+from saucebot.engines.base import NullEngine
+from saucebot.exts.sauce import MessageRef, Sauce, first_image_attachment, parse_message_link
 
 
 @pytest.mark.parametrize(
@@ -50,7 +55,7 @@ def test_first_image_attachment_returns_none_without_images() -> None:
     assert first_image_attachment(SimpleNamespace(attachments=[attachment("text/plain")])) is None
 
 
-async def test_sauce_refuses_cross_guild_link_before_fetch_or_search() -> None:
+async def test_sauce_refuses_cross_guild_link_before_fetch_or_search(tmp_path: Path) -> None:
     class FailingEngine:
         async def search(self, image_url: str, image_bytes: bytes) -> list[object]:
             raise AssertionError("cross-guild links must not reach the engine")
@@ -69,12 +74,66 @@ async def test_sauce_refuses_cross_guild_link_before_fetch_or_search() -> None:
         reply=reply,
     )
 
-    from saucebot.exts.sauce import Sauce
-
-    cog = Sauce(SimpleNamespace(engine=FailingEngine()))
+    config = parse_config(
+        {"watch": {"channel_ids": [1]}, "response": {"templates": ["{source_url}"]}}
+    )
+    cog = Sauce(
+        SimpleNamespace(
+            engine=FailingEngine(),
+            budget=DailyBudget(path=tmp_path / "budget.json", max_per_day=1),
+            config=config,
+        )
+    )
     await cog.sauce.callback(cog, ctx, "https://discord.com/channels/2/3/4")
 
     assert replies == ["That isn't a message link from this server."]
+
+
+async def test_sauce_is_silent_in_a_disallowed_channel(tmp_path: Path) -> None:
+    replies: list[str] = []
+
+    async def reply(content: str) -> None:
+        replies.append(content)
+
+    ctx = SimpleNamespace(
+        guild=SimpleNamespace(id=1),
+        channel=SimpleNamespace(id=99),
+        message=SimpleNamespace(id=100, attachments=[]),
+        reply=reply,
+    )
+    config = parse_config(
+        {
+            "watch": {"channel_ids": [1]},
+            "response": {"templates": ["{source_url}"]},
+            "command": {"allowed_channel_ids": [42]},
+        }
+    )
+    cog = Sauce(
+        SimpleNamespace(
+            engine=NullEngine(),
+            budget=DailyBudget(path=tmp_path / "budget.json", max_per_day=1),
+            config=config,
+        )
+    )
+
+    await cog.sauce.callback(cog, ctx)
+
+    assert replies == []
+
+
+@asynccontextmanager
+async def _typing():
+    yield
+
+
+def _configured_bot(engine):
+    return SimpleNamespace(
+        engine=engine,
+        budget=SimpleNamespace(acquire=AsyncMock(return_value=True)),
+        config=parse_config(
+            {"watch": {"channel_ids": [1]}, "response": {"templates": ["{source_url}"]}}
+        ),
+    )
 
 
 def _replying_context(channel: object, *, author_id: int = 7) -> tuple[SimpleNamespace, list[str]]:
@@ -88,6 +147,7 @@ def _replying_context(channel: object, *, author_id: int = 7) -> tuple[SimpleNam
         guild=SimpleNamespace(id=1, get_channel_or_thread=lambda channel_id: channel),
         message=SimpleNamespace(id=99, attachments=[]),
         reply=reply,
+        typing=_typing,
     )
     return ctx, replies
 
@@ -122,7 +182,7 @@ async def test_linked_message_requires_caller_read_permissions_before_fetch_or_s
 
     from saucebot.exts.sauce import Sauce
 
-    cog = Sauce(SimpleNamespace(engine=FailingEngine()))
+    cog = Sauce(_configured_bot(FailingEngine()))
     await cog.sauce.callback(cog, ctx, "https://discord.com/channels/1/2/3")
 
     assert replies == ["I can't see that message."]
@@ -146,7 +206,7 @@ async def test_linked_message_with_caller_read_permissions_fetches_and_searches(
 
     from saucebot.exts.sauce import Sauce
 
-    cog = Sauce(SimpleNamespace(engine=EmptyEngine()))
+    cog = Sauce(_configured_bot(EmptyEngine()))
     await cog.sauce.callback(cog, ctx, "https://discord.com/channels/1/2/3")
 
     channel.fetch_message.assert_awaited_once_with(3)
@@ -176,7 +236,7 @@ async def test_private_thread_nonmember_cannot_borrow_bot_access() -> None:
 
     from saucebot.exts.sauce import Sauce
 
-    cog = Sauce(SimpleNamespace(engine=FailingEngine()))
+    cog = Sauce(_configured_bot(FailingEngine()))
     await cog.sauce.callback(cog, ctx, "https://discord.com/channels/1/2/3")
 
     channel.fetch_member.assert_awaited_once_with(7)
@@ -202,7 +262,7 @@ async def test_private_thread_member_can_fetch_linked_message() -> None:
 
     from saucebot.exts.sauce import Sauce
 
-    cog = Sauce(SimpleNamespace(engine=EmptyEngine()))
+    cog = Sauce(_configured_bot(EmptyEngine()))
     await cog.sauce.callback(cog, ctx, "https://discord.com/channels/1/2/3")
 
     channel.fetch_member.assert_awaited_once_with(7)

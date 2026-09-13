@@ -10,7 +10,13 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
-from saucebot.engines.base import DEFAULT_EXCLUDED_DOMAINS, EngineError, filter_excluded_domains
+from saucebot.budget import DailyBudget
+from saucebot.engines.base import (
+    EngineError,
+    ImageSearchEngine,
+    SourceHit,
+    filter_excluded_domains,
+)
 
 if TYPE_CHECKING:
     from saucebot.bot import SauceBot
@@ -44,6 +50,35 @@ def first_image_attachment(message: discord.Message) -> discord.Attachment | Non
     return None
 
 
+@dataclass(frozen=True)
+class LookupResult:
+    """Outcome of one search: found / not_found / over_budget / error."""
+
+    status: str
+    hit: SourceHit | None = None
+
+
+async def lookup_source(
+    engine: ImageSearchEngine,
+    budget: DailyBudget,
+    excluded_domains: frozenset[str],
+    image_url: str,
+    image_bytes: bytes,
+) -> LookupResult:
+    """Spend one unit of budget on a search and return the best non-excluded hit."""
+    if not await budget.acquire():
+        return LookupResult(status="over_budget")
+    try:
+        hits = await engine.search(image_url, image_bytes)
+    except EngineError:
+        log.exception("engine failed searching %s", image_url)
+        return LookupResult(status="error")
+    hits = filter_excluded_domains(hits, excluded_domains)
+    if not hits:
+        return LookupResult(status="not_found")
+    return LookupResult(status="found", hit=hits[0])
+
+
 class Sauce(commands.Cog):
     def __init__(self, bot: SauceBot) -> None:
         self.bot = bot
@@ -52,6 +87,9 @@ class Sauce(commands.Cog):
     @commands.guild_only()
     async def sauce(self, ctx: commands.Context, ref_url: str | None = None) -> None:
         target = ctx.message
+        allowed = self.bot.config.command.allowed_channel_ids
+        if allowed and ctx.channel.id not in allowed:
+            return
         if ref_url is not None:
             ref = parse_message_link(ref_url)
             if ref is None or ctx.guild is None or ref.guild_id != ctx.guild.id:
@@ -102,16 +140,27 @@ class Sauce(commands.Cog):
     async def _lookup(self, ctx: commands.Context, attachment: discord.Attachment) -> None:
         try:
             image_bytes = await attachment.read()
-            hits = await self.bot.engine.search(attachment.url, image_bytes)
-        except (EngineError, discord.HTTPException):
-            log.exception("sauce lookup failed for message %s", ctx.message.id)
-            await ctx.reply("Search failed. Check the logs.")
+        except discord.HTTPException:
+            log.exception("could not read attachment on message %s", ctx.message.id)
+            await ctx.reply("I couldn't read that image.")
             return
-        hits = filter_excluded_domains(hits, DEFAULT_EXCLUDED_DOMAINS)
-        if not hits:
-            await ctx.reply("No source found.")
+        async with ctx.typing():
+            result = await lookup_source(
+                self.bot.engine,
+                self.bot.budget,
+                self.bot.config.all_excluded_domains,
+                attachment.url,
+                image_bytes,
+            )
+        messages = {
+            "over_budget": "Today's search budget is spent. Try again tomorrow.",
+            "error": "Search failed. Check the logs.",
+            "not_found": "No source found.",
+        }
+        if result.status == "found" and result.hit is not None:
+            await ctx.reply(f"Source: {result.hit.url}")
             return
-        await ctx.reply(f"Source: {hits[0].url}")
+        await ctx.reply(messages[result.status])
 
 
 async def setup(bot: SauceBot) -> None:

@@ -5,6 +5,8 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 
+from saucebot.budget import DailyBudget
+from saucebot.config import Config
 from saucebot.engines.base import ImageSearchEngine
 
 EXTENSIONS: tuple[str, ...] = ("saucebot.exts.sauce",)
@@ -18,13 +20,22 @@ def build_intents() -> discord.Intents:
 
 
 class SauceBot(commands.Bot):
-    def __init__(self, *, command_prefix: str, engine: ImageSearchEngine) -> None:
+    def __init__(
+        self,
+        *,
+        command_prefix: str,
+        engine: ImageSearchEngine,
+        budget: DailyBudget,
+        config: Config,
+    ) -> None:
         super().__init__(
             command_prefix=command_prefix,
             intents=build_intents(),
             allowed_mentions=discord.AllowedMentions.none(),
         )
         self.engine = engine
+        self.budget = budget
+        self.config = config
 
     async def setup_hook(self) -> None:
         for name in EXTENSIONS:

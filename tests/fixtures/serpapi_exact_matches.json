@@ -1,0 +1,67 @@
+{
+  "search_metadata": {
+    "id": "6aa5c78adc74d0792f5a55e4",
+    "status": "Success",
+    "created_at": "2026-09-12 21:43:38 UTC",
+    "total_time_taken": 4.71
+  },
+  "search_parameters": {
+    "engine": "google_lens",
+    "url": "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png",
+    "type": "exact_matches"
+  },
+  "exact_matches": [
+    {
+      "position": 1,
+      "title": "Python (@pythonlang) - Facebook",
+      "source": "Facebook",
+      "source_icon": "https://serpapi.com/images/i/TRIMMED",
+      "link": "https://www.facebook.com/pythonlang/?locale=bs_BA",
+      "thumbnail": "https://serpapi.com/images/url/TRIMMED",
+      "actual_image_width": 532,
+      "actual_image_height": 532
+    },
+    {
+      "position": 2,
+      "title": "Python User Group Graz - GitHub",
+      "source": "GitHub",
+      "source_icon": "https://serpapi.com/images/i/TRIMMED",
+      "link": "https://github.com/pygraz",
+      "thumbnail": "https://serpapi.com/images/url/TRIMMED",
+      "actual_image_width": 200,
+      "actual_image_height": 200
+    },
+    {
+      "position": 3,
+      "title": "Python is dead. Long live Python! | SOPHOS",
+      "source": "Sophos",
+      "source_icon": "https://serpapi.com/images/i/TRIMMED",
+      "link": "https://www.sophos.com/en-us/blog/python-is-dead-long-live-python",
+      "thumbnail": "https://serpapi.com/images/url/TRIMMED",
+      "date": "Jan 3, 2020",
+      "actual_image_width": 372,
+      "actual_image_height": 194
+    },
+    {
+      "position": 4,
+      "title": "Python - Context BD",
+      "source": "Context BD",
+      "source_icon": "https://serpapi.com/images/i/TRIMMED",
+      "link": "https://contextbd.com/python/",
+      "thumbnail": "https://serpapi.com/images/url/TRIMMED",
+      "date": "Apr 28, 2015",
+      "actual_image_width": 400,
+      "actual_image_height": 400
+    },
+    {
+      "position": 5,
+      "title": "Custom Software Development - SolDevelo",
+      "source": "SolDevelo",
+      "source_icon": "https://serpapi.com/images/i/TRIMMED",
+      "link": "https://soldevelo.com/services/custom-software-development/",
+      "thumbnail": "https://serpapi.com/images/url/TRIMMED",
+      "actual_image_width": 454,
+      "actual_image_height": 454
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 import json
 import logging
-from datetime import date
-from datetime import datetime as real_datetime
+import os
+import time
+from datetime import UTC, date, datetime
 from pathlib import Path
 
-import saucebot.budget as budget_module
 from saucebot.budget import DailyBudget
 
 
@@ -81,7 +81,7 @@ async def test_failed_persistence_keeps_last_valid_state_and_does_not_grant(
     def fail_replace(source, destination) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr(budget_module.os, "replace", fail_replace)
+    monkeypatch.setattr(os, "replace", fail_replace)
     caplog.set_level(logging.ERROR, logger="saucebot.budget")
     assert await limit.acquire() is False
     assert (tmp_path / "budget.json").read_text() == original
@@ -97,18 +97,23 @@ async def test_failed_persistence_keeps_last_valid_state_and_does_not_grant(
     assert await restarted.acquire() is False
 
 
-async def test_default_today_uses_utc_date(tmp_path: Path, monkeypatch) -> None:
-    class FixedDateTime:
-        @classmethod
-        def now(cls, tz):
-            assert tz is budget_module.UTC
-            return real_datetime(2026, 9, 13, 0, 30, tzinfo=tz)
-
-    monkeypatch.setattr(budget_module, "datetime", FixedDateTime)
-    limit = DailyBudget(path=tmp_path / "budget.json", max_per_day=1)
-    assert await limit.acquire() is True
-    saved = json.loads((tmp_path / "budget.json").read_text())
-    assert saved["date"] == "2026-09-13"
+async def test_default_today_uses_utc_date(tmp_path: Path) -> None:
+    previous_tz = os.environ.get("TZ")
+    try:
+        os.environ["TZ"] = "UTC+24"
+        time.tzset()
+        expected = datetime.now(UTC).date()
+        assert date.today() != expected
+        limit = DailyBudget(path=tmp_path / "budget.json", max_per_day=1)
+        assert await limit.acquire() is True
+        saved = json.loads((tmp_path / "budget.json").read_text())
+        assert saved["date"] == expected.isoformat()
+    finally:
+        if previous_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = previous_tz
+        time.tzset()
 
 
 async def test_logs_exhaustion_once_per_day(tmp_path: Path, caplog) -> None:

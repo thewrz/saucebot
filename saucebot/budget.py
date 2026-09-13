@@ -45,7 +45,7 @@ class DailyBudget:
         return max(0, self._max_per_day - self._count)
 
     async def acquire(self) -> bool:
-        """Take one search from today's budget. False means the budget is spent."""
+        """Take one search; False means exhausted or persistence failed."""
         async with self._lock:
             today = self._today()
             day, count = self._day, self._count

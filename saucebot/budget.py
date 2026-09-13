@@ -9,11 +9,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import tempfile
 from collections.abc import Callable
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+
+
+def _utc_today() -> date:
+    return datetime.now(UTC).date()
 
 
 class DailyBudget:
@@ -23,12 +29,13 @@ class DailyBudget:
         self,
         path: Path,
         max_per_day: int,
-        today: Callable[[], date] = date.today,
+        today: Callable[[], date] = _utc_today,
     ) -> None:
         self._path = Path(path)
         self._max_per_day = max_per_day
         self._today = today
         self._lock = asyncio.Lock()
+        self._exhaustion_logged_day: date | None = None
         self._day, self._count = self._load()
 
     @property
@@ -41,27 +48,61 @@ class DailyBudget:
         """Take one search from today's budget. False means the budget is spent."""
         async with self._lock:
             today = self._today()
-            if self._day != today:
-                self._day, self._count = today, 0
-            if self._count >= self._max_per_day:
+            day, count = self._day, self._count
+            if day != today:
+                day, count = today, 0
+            if count >= self._max_per_day:
+                if self._exhaustion_logged_day != today:
+                    log.info("daily search budget exhausted for %s", self._path)
+                    self._exhaustion_logged_day = today
                 return False
-            self._count += 1
-            self._save()
+            previous = self._day, self._count
+            self._day, self._count = day, count + 1
+            if not self._save():
+                self._day, self._count = previous
+                return False
             return True
 
     def _load(self) -> tuple[date, int]:
         try:
             saved = json.loads(self._path.read_text())
-            return date.fromisoformat(saved["date"]), int(saved["count"])
+            if not isinstance(saved, dict):
+                raise TypeError("budget state must be an object")
+            count = saved["count"]
+            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                raise ValueError("budget count must be a non-negative integer")
+            return date.fromisoformat(saved["date"]), count
         except FileNotFoundError:
             return self._today(), 0
         except (ValueError, KeyError, TypeError, OSError):
             log.warning("budget file %s is unreadable; starting today's count at zero", self._path)
             return self._today(), 0
 
-    def _save(self) -> None:
+    def _save(self) -> bool:
+        temporary: Path | None = None
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(json.dumps({"date": self._day.isoformat(), "count": self._count}))
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self._path.parent,
+                prefix=f".{self._path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary = Path(handle.name)
+                json.dump({"date": self._day.isoformat(), "count": self._count}, handle)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self._path)
+            temporary = None
+            return True
         except OSError:
             log.exception("could not persist the search budget to %s", self._path)
+            return False
+        finally:
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    log.exception("could not clean up temporary budget file %s", temporary)

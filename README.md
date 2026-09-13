@@ -20,6 +20,15 @@ finds where the image came from, calls the poster out with the source. Fork of
 - `?sauce` with an image attached — search that image.
 - `?sauce <message link>` — search the first image on a message in this server.
 
+The watcher uses the exact channel IDs in `config.toml`; include each child
+thread ID explicitly when threads should be watched. Its per-user cooldown starts
+when a watched search is attempted, including searches that return no result,
+match the poster, or fail. A selected Discord CDN URL is sent to SerpApi, which
+fetches the image for the Lens search.
+
+The watcher and `?sauce` share the daily search cap. The manual command has no
+per-user cooldown; use `command.allowed_channel_ids` to control where it can run.
+
 ## Development
 
 `scripts/verify.sh` runs lint, format check, tests, and a dependency audit; CI
@@ -40,6 +49,8 @@ docker compose logs -f
 ```
 
 `config.toml` is mounted read-only; `data/` holds the persisted daily search count.
+If the budget file is missing, corrupt, or unreadable, the bot follows its
+recovery policy and starts that day's count at zero.
 After editing `config.toml`, restart with `docker compose restart` — the bot reads
 its configuration once, at startup.
 

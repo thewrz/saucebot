@@ -88,10 +88,12 @@ class Watcher(commands.Cog):
         config = self.bot.config
         if not should_watch(message, config):
             return
-        if not self.cooldown.check_and_stamp(message.author.id):
-            log.debug("cooldown active for %s; skipping", message.author.id)
-            return
         try:
+            if (await self.bot.get_context(message)).valid:
+                return
+            if not self.cooldown.check_and_stamp(message.author.id):
+                log.debug("cooldown active for %s; skipping", message.author.id)
+                return
             await self._inspect(message, config)
         except Exception:
             # The listener must never propagate: a traceback here would be logged

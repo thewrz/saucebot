@@ -98,6 +98,20 @@ def test_mention_mode_accepts_templates_that_mention() -> None:
     assert parse_config(raw).response.mode is ResponseMode.MENTION
 
 
+def test_mention_mode_rejects_an_escaped_user_placeholder() -> None:
+    raw = with_change("response", "mode", "mention")
+    raw["response"]["templates"] = ["{{user}} stolen! {source_url}"]
+    with pytest.raises(ConfigError, match="user"):
+        parse_config(raw)
+
+
+def test_mention_mode_accepts_a_real_user_placeholder_with_escaped_braces() -> None:
+    raw = with_change("response", "mode", "mention")
+    template = "{{user}} says {user} stole it: {source_url}"
+    raw["response"]["templates"] = [template]
+    assert parse_config(raw).response.templates == (template,)
+
+
 def test_malformed_template_braces_are_rejected() -> None:
     with pytest.raises(ConfigError, match="template"):
         parse_config(with_change("response", "templates", ["{source_url"]))

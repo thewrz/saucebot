@@ -69,6 +69,38 @@ class MatchConfig(_Section):
     self_match_threshold: int = Field(default=80, ge=0, le=100)
 
 
+def _template_placeholder_names(template: str) -> frozenset[str]:
+    try:
+        parts = list(string.Formatter().parse(template))
+    except ValueError as exc:
+        raise ValueError(f"template {template!r} has invalid syntax: {exc}") from exc
+
+    fields: set[str] = set()
+    for _, name, format_spec, conversion in parts:
+        if name is None:
+            continue
+        if not name:
+            raise ValueError(
+                f"template {template!r} has invalid syntax: "
+                "empty or positional placeholders are not supported"
+            )
+        if name.isdecimal():
+            raise ValueError(
+                f"template {template!r} has invalid syntax: "
+                "positional placeholders are not supported"
+            )
+        if conversion is not None:
+            raise ValueError(
+                f"template {template!r} has invalid syntax: conversions are not supported"
+            )
+        if format_spec:
+            raise ValueError(
+                f"template {template!r} has invalid syntax: format specifications are not supported"
+            )
+        fields.add(name)
+    return frozenset(fields)
+
+
 class ResponseConfig(_Section):
     mode: ResponseMode = ResponseMode.REPLY
     templates: tuple[str, ...] = Field(min_length=1)
@@ -77,22 +109,7 @@ class ResponseConfig(_Section):
     @classmethod
     def templates_use_only_known_placeholders(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         for template in value:
-            try:
-                fields: set[str] = set()
-                for _, name, format_spec, conversion in string.Formatter().parse(template):
-                    if name is None:
-                        continue
-                    if not name:
-                        raise ValueError("empty or positional placeholders are not supported")
-                    if name.isdecimal():
-                        raise ValueError("positional placeholders are not supported")
-                    if conversion is not None:
-                        raise ValueError("conversions are not supported")
-                    if format_spec:
-                        raise ValueError("format specifications are not supported")
-                    fields.add(name)
-            except ValueError as exc:
-                raise ValueError(f"template {template!r} has invalid syntax: {exc}") from exc
+            fields = _template_placeholder_names(template)
             unknown = fields - ALLOWED_PLACEHOLDERS
             if unknown:
                 raise ValueError(
@@ -103,7 +120,9 @@ class ResponseConfig(_Section):
 
     @model_validator(mode="after")
     def mention_mode_needs_the_user_placeholder(self) -> ResponseConfig:
-        if self.mode is ResponseMode.MENTION and not all("{user}" in t for t in self.templates):
+        if self.mode is ResponseMode.MENTION and not all(
+            "user" in _template_placeholder_names(template) for template in self.templates
+        ):
             raise ValueError(
                 'mode = "mention" requires every template to contain the {user} placeholder, '
                 "otherwise the poster is never notified"

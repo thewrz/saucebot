@@ -9,7 +9,7 @@ from saucebot.budget import DailyBudget
 from saucebot.config import Config
 from saucebot.engines.base import ImageSearchEngine
 
-EXTENSIONS: tuple[str, ...] = ("saucebot.exts.sauce",)
+EXTENSIONS: tuple[str, ...] = ("saucebot.exts.sauce", "saucebot.exts.watcher")
 
 
 def build_intents() -> discord.Intents:

@@ -67,16 +67,18 @@ class SerpApiLensEngine:
                 payload = await self._read_json(response)
                 self._raise_for_status(response.status, payload)
         except aiohttp.ClientError as exc:
-            raise EngineError(f"SerpApi request failed: {exc}") from exc
-        except TimeoutError as exc:
-            raise EngineError(f"SerpApi timed out after {SEARCH_TIMEOUT_SECONDS}s") from exc
+            raise EngineError(f"SerpApi request failed ({type(exc).__name__})") from None
+        except TimeoutError:
+            raise EngineError(f"SerpApi timed out after {SEARCH_TIMEOUT_SECONDS}s") from None
         return parse_exact_matches(payload)
 
     async def _read_json(self, response: aiohttp.ClientResponse) -> dict[str, Any]:
         try:
             payload = await response.json(content_type=None)
-        except (ValueError, aiohttp.ClientError) as exc:
-            raise EngineError(f"SerpApi returned a non-JSON body (HTTP {response.status})") from exc
+        except (ValueError, aiohttp.ClientError):
+            raise EngineError(
+                f"SerpApi returned a non-JSON body (HTTP {response.status})"
+            ) from None
         if not isinstance(payload, dict):
             raise EngineError(f"SerpApi returned an unexpected body (HTTP {response.status})")
         return payload
@@ -85,9 +87,8 @@ class SerpApiLensEngine:
     def _raise_for_status(status: int, payload: dict[str, Any]) -> None:
         if status == 200:
             return
-        message = payload.get("error") or f"HTTP {status}"
         if status == 401:
-            raise BadKeyError(f"SerpApi rejected the API key: {message}")
+            raise BadKeyError("SerpApi rejected the API key (HTTP 401)")
         if status == 429:
-            raise QuotaError(f"SerpApi quota exhausted: {message}")
-        raise EngineError(f"SerpApi error (HTTP {status}): {message}")
+            raise QuotaError("SerpApi quota exhausted (HTTP 429)")
+        raise EngineError(f"SerpApi error (HTTP {status})")

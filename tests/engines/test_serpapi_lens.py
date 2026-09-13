@@ -1,12 +1,15 @@
 import json
+import logging
 from pathlib import Path
 
 import aiohttp
 import pytest
 from aiohttp import web
 
+from saucebot.budget import DailyBudget
 from saucebot.engines.base import BadKeyError, EngineError, QuotaError, SourceHit
 from saucebot.engines.serpapi_lens import SerpApiLensEngine, parse_exact_matches
+from saucebot.exts.sauce import lookup_source
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -107,7 +110,7 @@ async def test_unauthorised_raises_bad_key(serpapi) -> None:
     state["payload"] = {"error": "Invalid API key."}
     engine, session = await make_engine(server)
     async with session:
-        with pytest.raises(BadKeyError, match="Invalid API key"):
+        with pytest.raises(BadKeyError, match="HTTP 401"):
             await engine.search("https://cdn.example/image.png", b"")
 
 
@@ -117,7 +120,7 @@ async def test_rate_limited_raises_quota(serpapi) -> None:
     state["payload"] = {"error": "Your account has run out of searches."}
     engine, session = await make_engine(server)
     async with session:
-        with pytest.raises(QuotaError, match="run out of searches"):
+        with pytest.raises(QuotaError, match="HTTP 429"):
             await engine.search("https://cdn.example/image.png", b"")
 
 
@@ -128,7 +131,7 @@ async def test_other_failures_raise_engine_error(serpapi, status: int) -> None:
     state["payload"] = {"error": "Missing query `url` parameter."}
     engine, session = await make_engine(server)
     async with session:
-        with pytest.raises(EngineError, match="Missing query"):
+        with pytest.raises(EngineError, match=f"HTTP {status}"):
             await engine.search("https://cdn.example/image.png", b"")
 
 
@@ -143,3 +146,66 @@ async def test_non_json_body_raises_engine_error(aiohttp_server) -> None:
     async with session:
         with pytest.raises(EngineError):
             await engine.search("https://cdn.example/image.png", b"")
+
+
+class FailingSession:
+    def __init__(self, error: aiohttp.ClientError) -> None:
+        self.error = error
+
+    def get(self, *args, **kwargs):
+        raise self.error
+
+
+def client_error_with_key(api_key: str) -> aiohttp.ClientResponseError:
+    url = f"https://serpapi.com/search?api_key={api_key}"
+    request_info = aiohttp.RequestInfo(url=url, method="GET", headers={}, real_url=url)
+    return aiohttp.ClientResponseError(
+        request_info=request_info,
+        history=(),
+        status=503,
+        message="upstream connection failed",
+    )
+
+
+async def test_lookup_logs_transport_traceback_without_api_key(tmp_path, caplog) -> None:
+    api_key = "synthetic-transport-secret"
+    engine = SerpApiLensEngine(
+        session=FailingSession(client_error_with_key(api_key)), api_key=api_key
+    )
+    caplog.set_level(logging.ERROR, logger="saucebot.exts.sauce")
+
+    result = await lookup_source(
+        engine,
+        DailyBudget(path=tmp_path / "budget.json", max_per_day=1),
+        frozenset(),
+        "https://cdn.example/image.png",
+        b"",
+    )
+
+    assert result.status == "error"
+    assert api_key not in caplog.text
+
+
+async def test_lookup_logs_provider_error_without_api_key(aiohttp_server, tmp_path, caplog) -> None:
+    api_key = "synthetic-provider-secret"
+
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response({"error": f"invalid key {api_key}"}, status=401)
+
+    app = web.Application()
+    app.router.add_get("/search", handler)
+    server = await aiohttp_server(app)
+    engine, session = await make_engine(server, api_key=api_key)
+    caplog.set_level(logging.ERROR, logger="saucebot.exts.sauce")
+
+    async with session:
+        result = await lookup_source(
+            engine,
+            DailyBudget(path=tmp_path / "budget.json", max_per_day=1),
+            frozenset(),
+            "https://cdn.example/image.png",
+            b"",
+        )
+
+    assert result.status == "error"
+    assert api_key not in caplog.text

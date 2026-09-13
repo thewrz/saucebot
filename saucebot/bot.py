@@ -28,7 +28,11 @@ class SauceBot(commands.Bot):
         budget: DailyBudget,
         config: Config,
     ) -> None:
-        super().__init__(command_prefix=command_prefix, intents=build_intents())
+        super().__init__(
+            command_prefix=command_prefix,
+            intents=build_intents(),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
         self.engine = engine
         self.budget = budget
         self.config = config

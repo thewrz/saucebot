@@ -1,5 +1,8 @@
+import logging
 from dataclasses import dataclass
 from pathlib import Path
+
+import pytest
 
 from saucebot.budget import DailyBudget
 from saucebot.engines.base import EngineError, SourceHit
@@ -60,13 +63,19 @@ async def test_only_excluded_hits_reports_not_found(tmp_path: Path) -> None:
     assert result.status == "not_found"
 
 
-async def test_exhausted_budget_skips_the_engine(tmp_path: Path) -> None:
+async def test_exhausted_budget_skips_engine_and_logs_once_per_day(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     engine = StubEngine(hits=[SourceHit("https://a.example/x", "A", "A")])
     limit = budget(tmp_path, max_per_day=1)
     await lookup_source(engine, limit, EXCLUDED, "https://cdn/x.png", b"")
-    result = await lookup_source(engine, limit, EXCLUDED, "https://cdn/x.png", b"")
-    assert result.status == "over_budget"
+    with caplog.at_level(logging.INFO):
+        results = [
+            await lookup_source(engine, limit, EXCLUDED, "https://cdn/x.png", b"") for _ in range(3)
+        ]
+    assert [result.status for result in results] == ["over_budget"] * 3
     assert engine.calls == 1
+    assert sum("daily search budget exhausted" in record.message for record in caplog.records) == 1
 
 
 async def test_engine_failure_is_reported_not_raised(tmp_path: Path) -> None:

@@ -78,9 +78,21 @@ class ResponseConfig(_Section):
     def templates_use_only_known_placeholders(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         for template in value:
             try:
-                fields = {name for _, name, _, _ in string.Formatter().parse(template) if name}
+                fields: set[str] = set()
+                for _, name, format_spec, conversion in string.Formatter().parse(template):
+                    if name is None:
+                        continue
+                    if not name:
+                        raise ValueError("empty or positional placeholders are not supported")
+                    if name.isdecimal():
+                        raise ValueError("positional placeholders are not supported")
+                    if conversion is not None:
+                        raise ValueError("conversions are not supported")
+                    if format_spec:
+                        raise ValueError("format specifications are not supported")
+                    fields.add(name)
             except ValueError as exc:
-                raise ValueError(f"template {template!r} is malformed: {exc}") from exc
+                raise ValueError(f"template {template!r} has invalid syntax: {exc}") from exc
             unknown = fields - ALLOWED_PLACEHOLDERS
             if unknown:
                 raise ValueError(

@@ -63,13 +63,14 @@ class StubEngine:
         return list(self.hits or [])
 
 
-def bot(tmp_path, engine, *, response=None, budget_limit: int = 5):
+def bot(tmp_path, engine, *, response=None, budget_limit: int = 5, command_valid: bool = False):
     raw = {"watch": {"channel_ids": [WATCHED_CHANNEL], "user_ids": [WATCHED_USER]}}
     raw["response"] = response or {"templates": ["{source_url}"]}
     return SimpleNamespace(
         config=parse_config(raw),
         engine=engine,
         budget=DailyBudget(tmp_path / "budget.json", max_per_day=budget_limit),
+        get_context=AsyncMock(return_value=SimpleNamespace(valid=command_valid)),
     )
 
 
@@ -158,6 +159,20 @@ async def test_successful_nonself_hit_replies_once(tmp_path) -> None:
     msg.channel.send.assert_not_awaited()
     assert msg.reply.await_args.args == ("https://source.example/post",)
     assert engine.calls == 1
+
+
+async def test_valid_command_is_not_processed_by_watcher(tmp_path) -> None:
+    engine = StubEngine(hits=[SourceHit("https://source.example/post", "Source", "Source")])
+    msg = message()
+    runtime = bot(tmp_path, engine, command_valid=True)
+
+    await Watcher(runtime).on_message(msg)
+
+    runtime.get_context.assert_awaited_once_with(msg)
+    assert engine.calls == 0
+    msg.attachments[0].read.assert_not_awaited()
+    msg.reply.assert_not_awaited()
+    msg.channel.send.assert_not_awaited()
 
 
 async def test_no_hits_are_silent(tmp_path) -> None:

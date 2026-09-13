@@ -12,7 +12,8 @@ finds where the image came from, calls the poster out with the source. Fork of
    permissions.
 2. Get a SerpApi key at https://serpapi.com (the free plan is 250 searches a month).
 3. `cp .env.example .env` and fill in `DISCORD_TOKEN` and `SERPAPI_API_KEY`.
-4. `uv sync` then `uv run python -m saucebot`.
+4. `cp config.example.toml config.toml` and set the channels, users, and response templates.
+5. `uv sync` then `uv run python -m saucebot`.
 
 ## Commands
 
@@ -23,6 +24,31 @@ finds where the image came from, calls the poster out with the source. Fork of
 
 `scripts/verify.sh` runs lint, format check, tests, and a dependency audit; CI
 runs the same script.
+
+## Deployment (Docker)
+
+On the host:
+
+```bash
+git clone https://github.com/thewrz/saucebot.git && cd saucebot
+cp .env.example .env                  # fill in DISCORD_TOKEN and SERPAPI_API_KEY
+cp config.example.toml config.toml    # set channel_ids, user_ids, templates
+mkdir -p data
+sudo chown -R 10001:10001 data        # the container writes its daily budget as UID 10001
+docker compose up -d --build
+docker compose logs -f
+```
+
+`config.toml` is mounted read-only; `data/` holds the persisted daily search count.
+After editing `config.toml`, restart with `docker compose restart` — the bot reads
+its configuration once, at startup.
+
+### Discord setup
+
+The bot needs the **Message Content Intent** enabled in the developer portal, and
+the *Read Messages*, *Send Messages*, and *Read Message History* permissions in the
+channels it watches. To limit it to one channel, deny its role *View Channel*
+everywhere else — Discord enforces that server-side, which is stronger than config.
 
 ## License
 

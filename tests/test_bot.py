@@ -1,4 +1,6 @@
 from saucebot.bot import EXTENSIONS, SauceBot, build_intents
+from saucebot.budget import DailyBudget
+from saucebot.config import parse_config
 from saucebot.engines.base import NullEngine
 
 
@@ -9,8 +11,16 @@ def test_intents_are_default_plus_message_content_only() -> None:
     assert intents == expected
 
 
-async def test_setup_hook_loads_every_declared_extension() -> None:
-    bot = SauceBot(command_prefix="?", engine=NullEngine())
+async def test_setup_hook_loads_every_declared_extension(tmp_path) -> None:
+    config = parse_config(
+        {"watch": {"channel_ids": [1]}, "response": {"templates": ["{source_url}"]}}
+    )
+    bot = SauceBot(
+        command_prefix="?",
+        engine=NullEngine(),
+        budget=DailyBudget(path=tmp_path / "b.json", max_per_day=1),
+        config=config,
+    )
     await bot.setup_hook()
     assert set(bot.extensions) == set(EXTENSIONS)
     assert bot.get_cog("Sauce") is not None

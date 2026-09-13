@@ -1,0 +1,37 @@
+# Copy to config.toml and edit. config.toml is gitignored; this example is tracked.
+
+[watch]
+# Channels the bot watches. Required, and it refuses to start if this is empty.
+channel_ids = [123456789012345678]
+# Users to call out. Leave empty to watch everyone who posts in those channels.
+user_ids = []
+# Per-user quiet period after a call-out, in seconds.
+min_seconds_between_callouts = 60
+
+[search]
+engine = "serpapi_lens"
+# SerpApi's free plan is 250 searches a month; 8 a day stays inside it.
+max_searches_per_day = 8
+max_attachments_per_message = 3
+# Never cite these domains as a source. The Discord CDN hosts are always excluded.
+excluded_domains = []
+
+[match]
+# rapidfuzz score (0-100) at or above which the poster is treated as the original
+# author, and the bot stays silent.
+self_match_threshold = 80
+
+[response]
+# "reply" replies to the message (which pings the poster).
+# "mention" posts a new message; every template must then contain {user}.
+mode = "reply"
+# One is picked at random. Placeholders: {user} {source_url} {title} {author} {site}
+templates = [
+  "Stolen meme! Source: {source_url}",
+  "{user} that's from {author}: {source_url}",
+]
+
+[command]
+prefix = "?"
+# Where ?sauce may be used. Empty means anywhere the bot can see.
+allowed_channel_ids = []

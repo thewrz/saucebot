@@ -3191,10 +3191,12 @@ git commit -m "chore(deploy): digest-pinned container image and compose stack" -
 
 ## After the last PR
 
-1. **Adversarial review, once, at the very end.** With CI green on the whole stack, ask the other
-   harness for a blind review of `git diff main...feat/watcher` — Codex `gpt-5.6-sol` at effort
-   `xhigh`. Feed it only the diff: no spec, no issues, no PR bodies, tools disabled. Run it once;
-   do not re-run after the fix push.
+1. **Adversarial review, once, at the very end.** With CI green on the whole stack, ask the *other*
+   harness for a blind review of `git diff main...feat/watcher`. The direction depends on who
+   executed this plan: a **Claude** executor asks Codex (`gpt-6-astra`, effort `xhigh`); a **Codex**
+   executor asks Claude (`claude-opus-5`, effort `high`). Feed the reviewer only the diff — no spec,
+   no plan, no issues, no PR bodies — with file access disabled, so it judges what the code *does*
+   rather than what it was meant to do. Run it once; do not re-run after the fix push.
 2. **Merge in order** (1 → 6), letting each stacked PR retarget to `main` as its base merges.
 3. **Board:** move each issue to `Done` as its PR merges (`gh-project-move <N> "Done"`).
 4. **Rotate the SerpApi key** used during development, and confirm the deployed `.env` has the new one.
